@@ -12,22 +12,10 @@
 	     '("melpa" . "http://melpa.milkbox.net/packages/"))
 (package-initialize)
 
-;; --------------------------------------
-;; -- customize look and feel of emacs --
-;; --------------------------------------
 
-;; Theme
-(load-theme 'tango-dark t)
-
-;; powerline
-(require 'powerline)
-(powerline-default-theme)
-(set-face-attribute 'mode-line nil
-                    :foreground "White"
-                    :background "AquaMarine4"
-                    :box nil
-		    )
-(setq powerline-default-separator 'arrow)
+;; use alt as meta
+;; https://www.emacswiki.org/emacs/MetaKeyProblems
+(set-keyboard-coding-system nil)
 
 ;; Parenthesis matching mode
 (show-paren-mode 1)
@@ -35,14 +23,14 @@
 ;; show line number for customized modes
 (require 'linum)
 (global-linum-mode t)
-(setq linum-format "%d ")
+(setq linum-format "%4d ")
 
 (defcustom linum-disabled-modes-list '(eshell-mode wl-summary-mode compilation-mode org-mode text-mode dired-mode doc-view-mode)
   "* List of modes disabled when global linum mode is on"
   :type '(repeat (sexp :tag "Major mode"))
   :tag " Major modes where linum is disabled: "
   :group 'linum
-  )
+)
 
 (defcustom linum-disable-starred-buffers 't
   "* Disable buffers that have stars in them like *Gnu Emacs*"
@@ -62,103 +50,119 @@
 ;; Delete should be backspace                                                                        
 (normal-erase-is-backspace-mode 0)
 
+
+;; ---------------------
+;; -- backup settings --
+;; ---------------------
+;; Ref: https://www.emacswiki.org/emacs/ForceBackups
+
+(setq version-control t     ;; Use version numbers for backups.
+      kept-new-versions 10  ;; Number of newest versions to keep.
+      kept-old-versions 0   ;; Number of oldest versions to keep.
+      delete-old-versions t ;; Don't ask to delete excess backup versions.
+      backup-by-copying t)  ;; Copy all files, don't rename them.
+
+(setq vc-make-backup-files t)
+
+;; Default and per-save backups go here:
+(setq backup-directory-alist '(("" . "~/.emacs.d/backup/per-save")))
+
+(defun force-backup-of-buffer ()
+  ;; Make a special "per session" backup at the first save of each
+  ;; emacs session.
+  (when (not buffer-backed-up)
+    ;; Override the default parameters for per-session backups.
+    (let ((backup-directory-alist '(("" . "~/.emacs.d/backup/per-session")))
+	  (kept-new-versions 3))
+      (backup-buffer)))
+  ;; Make a "per save" backup on each save.  The first save results in
+  ;; both a per-session and a per-save backup, to keep the numbering
+  ;; of per-save backups consistent.
+  (let ((buffer-backed-up nil))
+    (backup-buffer)))
+
+(add-hook 'before-save-hook  'force-backup-of-buffer)
+
+
+;; --------------------------------------
+;; -- customize look and feel of emacs --
+;; --------------------------------------
+
+;; Theme
+(load-theme 'tango-dark t)
+
+;; powerline
+(require 'powerline)
+(powerline-default-theme)
+(setq powerline-arrow-shape 'curve)
+
+
 ;; -------------------------
 ;; -- Additional packages --
 ;; -------------------------
 
 ;; Enabling ido-mode
 (require 'ido)
+(setq ido-enable-flex-matching t)
+(setq ido-everywhere t)
 (ido-mode t)
 
-;; Org Mode
-(require 'org)
-(setq org-default-notes-file (concat org-directory "/notes.org"))
-(define-key global-map "\C-cc" 'org-capture)
-
-;; templates
-(setq org-capture-templates
-      '(("t" "Todo" entry (file+headline (concat org-directory "/gtd.org") "Tasks")
-	 "* TODO %?\n  %i\n  %a")
-	("a" "Appointments" entry (file+headline (concat org-directory "/gtd.org") "Appointments")
-	 "* Appointment: %?\n%^T\n%i\n  %a")
-	))
-(define-key global-map "\C-cl" 'org-store-link)
-(define-key global-map "\C-ca" 'org-agenda)
-(setq org-log-done t)
-(add-to-list 'auto-mode-alist '("\\.org$" . org-mode))                        
-(setq org-todo-keywords '("TODO" "STARTED" "WAITING" "CANCELED" "DONE"))                  
-(setq org-agenda-include-diary t)                                              
-(setq org-agenda-include-all-todo t)  
 
 ;; --------------------------------------
 ;; -- Language specific customizations --
 ;; --------------------------------------
 
-;; Python settings
-
-;; Smart tabs
-(smart-tabs-insinuate 'python)
+;; ---------------------
+;; -- Python settings --
+;; ---------------------
 
 ;; Return for newline and indent
-(add-hook 'python-mode-hook '(lambda ()
-  (local-set-key (kbd "RET") 'newline-and-indent)))
+(add-hook 'python-mode-hook
+	  (lambda ()
+ 	    (define-key python-mode-map "\r" 'newline-and-indent)))
+(define-key global-map (kbd "RET") 'newline-and-indent)
+
+(add-hook 'python-mode-hook
+	  (lambda ()
+	    (setq python-indent-offset 4)))
 
 
-;; Enabling jedi for python
-;; (add-hook 'python-mode-hook 'auto-complete-mode)
-;; (add-hook 'python-mode-hook 'jedi:ac-setup)
+;; ------------
+;; -- Auctex --
+;; ------------
 
-;; haskell-mode
-(add-hook 'haskell-mode-hook 'turn-on-haskell-doc-mode)
-(add-hook 'haskell-mode-hook 'turn-on-haskell-indentation)
+(setq ispell-program-name "/usr/local/bin/ispell")
+(setq TeX-auto-save t)
+(setq TeX-parse-self t)
+(setq-default TeX-master nil)
+(add-hook 'LaTeX-mode-hook 'visual-line-mode)
+(add-hook 'LaTeX-mode-hook 'flyspell-mode)
+(add-hook 'LaTeX-mode-hook 'LaTeX-math-mode)
+(add-hook 'LaTeX-mode-hook 'turn-on-reftex)
+(setq reftex-plug-into-AUCTeX t)
+(setq TeX-PDF-mode t)
 
-;; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+;; Use Skim as viewer, enable source <-> PDF sync
+;; make latexmk available via C-c C-c
+;; Note: SyncTeX is setup via ~/.latexmkrc (see below)
+(add-hook 'LaTeX-mode-hook (lambda ()
+			     (push
+			      '("latexmk" "latexmk -pdf %s" TeX-run-TeX nil t
+				:help "Run latexmk on file")
+			      TeX-command-list)))
+(add-hook 'TeX-mode-hook '(lambda () (setq TeX-command-default "latexmk")))
 
-;; ;; Based upon https://github.com/paul7/dev-conf/blob/master/.emacs-haskell
-;; (defvar cabal-use-sandbox t)
-;; ;; (setq-default haskell-program-name "ghci")
-;; (defun cabal-toggle-sandboxing-local ()
-;;   (interactive)
-;;   (set (make-local-variable 'cabal-use-sandbox) (not cabal-use-sandbox))
-;;   (message (format "This buffer haskell-process-type is ``%s''"
-;;                    (set (make-local-variable 'haskell-process-type)
-;;                         (if cabal-use-sandbox
-;;                             'cabal-repl
-;;                           'ghci)))))
+;; use Skim as default pdf viewer
+;; Skim's displayline is used for forward search (from .tex to .pdf)
+;; option -b highlights the current line; option -g opens Skim in the background
+(setq TeX-view-program-selection '((output-pdf "PDF Viewer")))
+(setq TeX-view-program-list
+           '(("PDF Viewer" "/Applications/Skim.app/Contents/SharedSupport/displayline -b -g %n %o %b")))
+;; (server-start) ; start emacs in server mode so that skim can talk to it
 
-;; (defun cabal-toggle-sandboxing ()
-;;   (interactive)
-;;   (setq cabal-use-sandbox (not cabal-use-sandbox))
-;;   (message (format "haskell-process-type is ``%s''"
-;;                    (setq haskell-process-type
-;;                         (if cabal-use-sandbox
-;;                             'cabal-repl
-;;                           'ghci)))))
+;; ---------------
+;; -- hql files --
+;; ---------------
 
-;; ;; %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-;; (custom-set-variables
-;;  ;; custom-set-variables was added by Custom.
-;;  ;; If you edit it by hand, you could mess it up, so be careful.
-;;  ;; Your init file should contain only one such instance.
-;;  ;; If there is more than one, they won't work right.
-;;  '(haskell-program-name "ghci"))
-;; (custom-set-faces
-;;  ;; custom-set-faces was added by Custom.
-;;  ;; If you edit it by hand, you could mess it up, so be careful.
-;;  ;; Your init file should contain only one such instance.
-;;  ;; If there is more than one, they won't work right.
-;;  '(default ((t (:background nil)))))
-(custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(default-input-method "TeX")
- '(haskell-program-name "cabal repl")
- '(org-agenda-files (quote ("~/org/gtd.org"))))
-(custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(default ((t (:background nil)))))
+(add-to-list 'auto-mode-alist '("\\.hql\\'" . sql-mode))
+
