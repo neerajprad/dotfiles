@@ -166,3 +166,10 @@
 
 (add-to-list 'auto-mode-alist '("\\.hql\\'" . sql-mode))
 
+;; ----------
+;; -- bash --
+;; ----------
+
+(setq sh-basic-offset 2)
+(setq sh-indentation 2)
+

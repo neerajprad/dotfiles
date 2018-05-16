@@ -40,8 +40,13 @@ export LS_COLORS='di=1:fi=0:ln=31:pi=5:so=5:bd=5:cd=5:or=31'
 ## -------------------------------
 
 # source custom bash config
-source ~/.bashrc_custom
-source ~/.bash_prompt
+if [[ -f ~/.bashrc_custom ]]; then
+  source ~/.bashrc_custom
+fi
+
+if [[ -f ~/.bash_prompt ]]; then
+  source ~/.bash_prompt
+fi
 
 # Java / mvn settings
 alias setjdk7='export JAVA_HOME=$(/usr/libexec/java_home -v 1.7)'
