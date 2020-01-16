@@ -14,17 +14,35 @@ Use [[https://github.com/jwiegley/use-package][use-package]] to install and conf
   ;(package-refresh-contents)
   (require 'use-package-ensure)
   (setq use-package-always-ensure t)
+  ; Show packages taking longer than 0.1 s to load.
+  (setq use-package-verbose t)
+  (setq use-package-compute-statistics t)
 #+end_src
 
 Always compile packages, and use the newest version available.
 
 #+begin_src emacs-lisp
   (use-package auto-compile
-    :config (auto-compile-on-load-mode))
-  (setq load-prefer-newer t)
+    :config
+    (auto-compile-on-load-mode)
+    (setq load-prefer-newer t))
+#+end_src
+
+* Utility functions
+While most env variables are loaded correctly using =osx-env-sync=, we may need
+to modify the =PATH= variable.
+#+begin_src emacs-lisp
+(defun np/append-to-path (path)
+  "Add a path both to the $PATH variable and to Emacs' exec-path."
+  (setenv "PATH" (concat (getenv "PATH") ":" path))
+  (add-to-list 'exec-path path))
 #+end_src
 
 * Change emacs defaults
+
+On OSX, follow the instructions in [[https://github.com/ersiner/osx-env-sync/][osx-env-sync]] to ensure that environment
+variables are synced from =.bash_profile= when emacs is launched as a GUI
+application.
 
 Use [[https://github.com/hrs/sensible-defaults.el][sensible-defaults.el]] for some basic settings.
 
@@ -39,7 +57,7 @@ file.
 
 #+begin_src emacs-lisp
   (use-package backup-each-save
-    :hook after-save-hook
+    :hook after-save-hook backup-each-save
     :init
     (defun backup-each-save-filter (filename)
       (let ((ignored-filenames
@@ -153,7 +171,7 @@ Allow to quickly open =config.org=
 #+begin_src emacs-lisp
   (defun np/visit-emacs-config ()
     (interactive)
-    (find-file "~/.emacs.d/config.org"))
+    (find-file "~/dotfiles/.emacs.d/config.org"))
   (global-set-key (kbd "C-c e") 'np/visit-emacs-config)
 #+end_src
 
@@ -260,10 +278,11 @@ Jump to definition
 ** Python
 Use =elpy= and =flycheck= for syntax checking.
 #+begin_src emacs-lisp
-  (use-package python-mode)
   (use-package elpy
+    :defer t
     :init
-    (elpy-enable)
+    (advice-add 'python-mode :before 'elpy-enable)
+    :config
     (setq elpy-rpc-virtualenv-path 'current)
     :hook
     (flycheck-mode))
@@ -271,9 +290,8 @@ Use =elpy= and =flycheck= for syntax checking.
 
 Configure Jedi with company mode
 #+begin_src emacs-lisp
-  (use-package company-jedi)
-  (add-to-list 'company-backends 'company-jedi)
-
+  (use-package jedi)
+  ;; (add-to-list 'company-backends 'company-jedi)
   (add-hook 'python-mode-hook 'jedi:setup)
   (setq jedi:complete-on-dot t)
 #+end_src
@@ -353,17 +371,34 @@ Add to templates
 
 ** Agenda
 #+begin_src emacs-lisp
-  (setq org-todo-keywords
-        '((sequence "TODO(t)" "WAIT(w)" "NEXT(n)"  "|"
-                    "DONE(d!)" "CANCELLED(c@)" "INACTIVE(i@)")))
-  (setq org-agenda-files (list "~/Dropbox/org/gtd/inbox.org"
-                               "~/Dropbox/org/gtd/gtd.org"
-                               "~/Dropbox/org/gtd/ideas.org"))
-  (setq org-log-into-drawer t)
+    (setq org-todo-keywords
+          '((sequence "TODO(t)" "WAIT(w)" "NEXT(n)"  "|"
+                      "DONE(d!)" "CANCELLED(c@)" "INACTIVE(i@)")))
+    (setq org-agenda-files (list "~/Dropbox/org/gtd/inbox.org"
+                                 "~/Dropbox/org/gtd/gtd.org"
+                                 "~/Dropbox/org/gtd/ideas.org"
+                                 "~/Dropbox/org/gtd/ideas.org"))
+    (setq org-log-into-drawer t)
 
-  (setq org-agenda-span 14
-        org-agenda-start-on-weekday nil
-        org-agenda-start-day "-3d")
+    (setq org-agenda-span 14
+          org-agenda-start-on-weekday nil
+          org-agenda-start-day "-3d")
+#+end_src
+
+** Journal
+Use =org-journal= package for daily journaling and integrate with agenda.
+#+begin_src emacs-lisp
+  (use-package org-journal
+    :defer t
+    :custom
+    (org-journal-dir "~/Dropbox/org/journal")
+    (org-extend-today-until 4)
+    (org-journal-enable-agenda-integration t)
+    (org-journal-date-format "%A, %d %B %Y")
+    (org-journal-file-type 'weekly)
+    :config
+    (setq org-journal-file-format
+          (format "%s_%s/%s" "%Y" org-journal-file-type "%m-%d.org")))
 #+end_src
 
 ** Habit tracking
@@ -371,4 +406,23 @@ Add to templates
 #+begin_src emacs-lisp
   (add-to-list 'org-modules 'org-habit t)
   (setq org-habit-show-habits-only-for-today nil)
+#+end_src
+
+** Exporting
+*latex*
+Use ox-latex. Use minted for syntax highlighting in code blocks.
+
+#+begin_src emacs-lisp
+(require 'ox-latex)
+(add-to-list 'org-latex-packages-alist '("" "minted" nil))
+(setq org-preview-latex-default-process 'imagemagick)
+(setq org-latex-pdf-process
+      '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+    "bibtex %b"
+    "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
+    "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 1.0))
+; update paths for latex and imagemagick
+(np/append-to-path "/Library/TeX/texbin/")
+(np/append-to-path "/usr/local/bin")
 #+end_src
