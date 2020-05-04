@@ -44,6 +44,13 @@ On OSX, follow the instructions in [[https://github.com/ersiner/osx-env-sync/][o
 variables are synced from =.bash_profile= when emacs is launched as a GUI
 application.
 
+Set alt as meta (option might be modified by [[https://github.com/railwaycat/homebrew-emacsmacport][emacsport]] on osx).
+
+#+begin_src emacs-lisp
+  (when (eq system-type 'darwin)
+    (setq mac-option-modifier 'meta))
+#+end_src
+
 Use [[https://github.com/hrs/sensible-defaults.el][sensible-defaults.el]] for some basic settings.
 
 #+begin_src emacs-lisp
@@ -57,8 +64,8 @@ file.
 
 #+begin_src emacs-lisp
   (use-package backup-each-save
-    :hook after-save-hook backup-each-save
     :init
+    (add-hook 'after-save-hook 'backup-each-save)
     (defun backup-each-save-filter (filename)
       (let ((ignored-filenames
              '("^/tmp" "semantic.cache$" "\\.emacs-places$"
@@ -71,6 +78,7 @@ file.
          ignored-filenames)
         (not matched-ignored-filename)))
     (setq backup-each-save-filter-function 'backup-each-save-filter))
+    (setq make-backup-files nil)
 #+end_src
 
 * UI preferences
@@ -290,10 +298,11 @@ Use =elpy= and =flycheck= for syntax checking.
 
 Configure Jedi with company mode
 #+begin_src emacs-lisp
-  (use-package jedi)
+  (use-package jedi
   ;; (add-to-list 'company-backends 'company-jedi)
-  (add-hook 'python-mode-hook 'jedi:setup)
-  (setq jedi:complete-on-dot t)
+    :config
+    (add-hook 'python-mode-hook 'jedi:setup)
+    (setq jedi:complete-on-dot nil))
 #+end_src
 * Org-mode Settings
 
@@ -352,7 +361,11 @@ Allow commenting in the language's major mode.
 
 ** Keybindings
 
-Add to templates
+Add to templates to autopopulate code blocks. Also, add some user keybindings.
+In particular, =org-journal= keybindings like =Cc-Cj= conflict with default org
+mode keybindings, so we can use consistent user keybindings that works the same.
+
+
 #+begin_src emacs-lisp
   (setq templs '(("el" "#+begin_src emacs-lisp\n\n#+end_src" "")
                  ("s" "#+begin_src ?\n\n#+end_src" "")))
@@ -360,7 +373,10 @@ Add to templates
         (nconc templs org-structure-template-alist))
 
   (global-set-key  (kbd "C-c a") 'org-agenda)
+  (global-set-key  (kbd "C-c j") 'org-journal-new-entry)
   (global-set-key (kbd "C-c i")
+                  (lambda () (interactive) (find-file "~/Dropbox/org/gtd/inbox.org")))
+  (global-set-key (kbd "C-c g")
                   (lambda () (interactive) (find-file "~/Dropbox/org/gtd/gtd.org")))
 #+end_src
 
@@ -371,18 +387,17 @@ Add to templates
 
 ** Agenda
 #+begin_src emacs-lisp
-    (setq org-todo-keywords
-          '((sequence "TODO(t)" "WAIT(w)" "NEXT(n)"  "|"
-                      "DONE(d!)" "CANCELLED(c@)" "INACTIVE(i@)")))
-    (setq org-agenda-files (list "~/Dropbox/org/gtd/inbox.org"
-                                 "~/Dropbox/org/gtd/gtd.org"
-                                 "~/Dropbox/org/gtd/ideas.org"
-                                 "~/Dropbox/org/gtd/ideas.org"))
-    (setq org-log-into-drawer t)
-
-    (setq org-agenda-span 14
-          org-agenda-start-on-weekday nil
-          org-agenda-start-day "-3d")
+  (setq org-todo-keywords
+        '((sequence "TODO(t)" "WAIT(w)" "NEXT(n)" "|"
+                    "DONE(d!)" "CANCELLED(c@)" "INACTIVE(i@)")))
+  (setq org-agenda-files (list "~/Dropbox/org/gtd/inbox.org"
+                               "~/Dropbox/org/gtd/gtd.org"))
+  (setq org-log-into-drawer t)
+  ;; allow refiling targets across all the above files
+  (setq org-refile-targets '((nil :maxlevel . 6) (org-agenda-files :maxlevel . 6)))
+  (setq org-agenda-span 14
+        org-agenda-start-on-weekday nil
+        org-agenda-start-day "-3d")
 #+end_src
 
 ** Journal
@@ -415,13 +430,14 @@ Use ox-latex. Use minted for syntax highlighting in code blocks.
 #+begin_src emacs-lisp
 (require 'ox-latex)
 (add-to-list 'org-latex-packages-alist '("" "minted" nil))
-(setq org-preview-latex-default-process 'imagemagick)
+(setq org-preview-latex-default-process 'dvisvgm)
 (setq org-latex-pdf-process
       '("pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
     "bibtex %b"
     "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"
     "pdflatex -shell-escape -interaction nonstopmode -output-directory %o %f"))
-(setq org-format-latex-options (plist-put org-format-latex-options :scale 1.0))
+(setq org-format-latex-options (plist-put org-format-latex-options :scale 1.))
+(setq org-format-latex-options (plist-put org-format-latex-options :foreground "GhostWhite"))
 ; update paths for latex and imagemagick
 (np/append-to-path "/Library/TeX/texbin/")
 (np/append-to-path "/usr/local/bin")
