@@ -1,4 +1,4 @@
-# -*- fill-column: 80; eval: (auto-fill-mode 1); -*-
+ee# -*- fill-column: 80; eval: (auto-fill-mode 1); -*-
 #+TITLE: Emacs Configuration
 #+AUTHOR: Neeraj Pradhan
 #+PROPERTY: header-args    :results silent
@@ -59,26 +59,33 @@ Use [[https://github.com/hrs/sensible-defaults.el][sensible-defaults.el]] for so
   (sensible-defaults/use-all-keybindings)
 #+end_src
 
+Set column width to 80 by default in auto-fill-mode
+#+begin_src emacs-lisp
+(setq column-width 80)
+#+end_src
+
+
 Use [[https://www.emacswiki.org/emacs/BackupEachSave][Backup Each Save]] to change backup location to =~/.backups= and save each
 file.
 
 #+begin_src emacs-lisp
-  (use-package backup-each-save
-    :init
-    (add-hook 'after-save-hook 'backup-each-save)
-    (defun backup-each-save-filter (filename)
-      (let ((ignored-filenames
-             '("^/tmp" "semantic.cache$" "\\.emacs-places$"
-               "\\.recentf$" ".newsrc\\(\\.eld\\)?"))
-            (matched-ignored-filename nil))
-        (mapc
-         (lambda (x)
-           (when (string-match x filename)
-             (setq matched-ignored-filename t)))
-         ignored-filenames)
-        (not matched-ignored-filename)))
-    (setq backup-each-save-filter-function 'backup-each-save-filter))
-    (setq make-backup-files nil)
+    (use-package backup-each-save
+      :defer t
+      :init
+      (add-hook 'after-save-hook 'backup-each-save)
+      (defun backup-each-save-filter (filename)
+        (let ((ignored-filenames
+               '("^/tmp" "semantic.cache$" "\\.emacs-places$"
+                 "\\.recentf$" ".newsrc\\(\\.eld\\)?"))
+              (matched-ignored-filename nil))
+          (mapc
+           (lambda (x)
+             (when (string-match x filename)
+               (setq matched-ignored-filename t)))
+           ignored-filenames)
+          (not matched-ignored-filename)))
+      (setq backup-each-save-filter-function 'backup-each-save-filter))
+      (setq make-backup-files nil)
 #+end_src
 
 * UI preferences
@@ -127,8 +134,8 @@ Use "solarized-dark" theme.
     "Apply the `solarized-dark' theme and make frames just slightly \
 transparent."
     (interactive)
-    (load-theme 'solarized-dark t)
-    (np/transparency 90))
+    (load-theme 'solarized-gruvbox-dark t)
+    (np/transparency 100))
 #+end_src
 
 If this code is being evaluated by =emacs --daemon=, ensure that each subsequent
@@ -174,6 +181,11 @@ containing point.
 #+end_src
 
 * Editor Settings
+** Start server mode
+#+begin_src emacs-lisp
+(server-mode t)
+#+end_src
+
 ** Keybindings
 Allow to quickly open =config.org=
 #+begin_src emacs-lisp
@@ -316,6 +328,18 @@ Use pretty bullets
     (add-hook 'org-mode-hook 'org-bullets-mode))
 #+end_src
 
+Use =Visual Fill Column= in text mode. This avoids inserting hard wraps at the
+end of =fill-column=. At the same time, unlike [[https://www.emacswiki.org/emacs/VisualLineMode][Visual Line Mode]], this respects
+the column width specified by =fill-column=.
+
+#+begin_src emacs-lisp
+  (use-package visual-fill-column
+    :init
+    (add-hook 'org-mode-hook 'visual-fill-column-mode)
+    (add-hook 'org-mode-hook 'visual-line-mode))
+
+#+end_src
+
 Downward arrow instead of ellipsis
 #+begin_src emacs-lisp
   (setq org-ellipsis "⤵")
@@ -367,13 +391,13 @@ mode keybindings, so we can use consistent user keybindings that works the same.
 
 
 #+begin_src emacs-lisp
-  (setq templs '(("el" "#+begin_src emacs-lisp\n\n#+end_src" "")
-                 ("s" "#+begin_src ?\n\n#+end_src" "")))
-  (setq org-structure-template-alist
-        (nconc templs org-structure-template-alist))
+  ;; (setq templs '(("el" . "src emacs-lisp")))
+  ;;(setq org-structure-template-alist
+  ;;      (nconc templs org-structure-template-alist))
+  (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
 
   (global-set-key  (kbd "C-c a") 'org-agenda)
-  (global-set-key  (kbd "C-c j") 'org-journal-new-entry)
+  (global-set-key  (kbd "C-c n j") 'org-journal-new-entry)
   (global-set-key (kbd "C-c i")
                   (lambda () (interactive) (find-file "~/Dropbox/org/gtd/inbox.org")))
   (global-set-key (kbd "C-c g")
@@ -399,21 +423,87 @@ mode keybindings, so we can use consistent user keybindings that works the same.
         org-agenda-start-on-weekday nil
         org-agenda-start-day "-3d")
 #+end_src
-
 ** Journal
 Use =org-journal= package for daily journaling and integrate with agenda.
 #+begin_src emacs-lisp
   (use-package org-journal
     :defer t
     :custom
-    (org-journal-dir "~/Dropbox/org/journal")
+    (org-journal-dir "~/Dropbox/org/roam/journal")
     (org-extend-today-until 4)
     (org-journal-enable-agenda-integration t)
+    (org-journal-date-prefix "#+TITLE: ")
+    (org-journal-file-format "%Y-%m-%d.org")
     (org-journal-date-format "%A, %d %B %Y")
-    (org-journal-file-type 'weekly)
+    :bind (:map org-mode-map
+                (("C-c n s" . org-journal-new-scheduled-entry))))
+    ;; Earlier config - weekly org files
+    ;; (org-journal-file-type 'weekly)
+    ;; :config
+    ;; (setq org-journal-file-format
+    ;;       (format "%s_%s/%s" "%Y" org-journal-file-type "%m-%d.org")))
+
+#+end_src
+
+** Org-Roam
+
+#+begin_src emacs-lisp
+  (use-package org-roam
+    :custom
+    (org-roam-directory "~/Dropbox/org/roam")
+    (org-roam-link-title-format "R:%s")
+    :bind (:map org-roam-mode-map
+                (("C-c n b" . org-roam-switch-to-buffer)
+                 ("C-c n g" . org-roam-graph-show))
+           :map org-mode-map
+                (("C-c n i" . org-roam-insert)
+                 ("C-c n h" . org-roam-jump-to-index)
+                 ("C-c n f" . org-roam-find-file)
+                 ("C-c n r" . org-roam)
+                 ("C-c n I" . org-roam-insert-immediate))))
+#+end_src
+
+Modify default capture template
+#+begin_src emacs-lisp
+(setq org-roam-index-file "~/Dropbox/org/roam/index.org")
+(setq org-roam-capture-templates
+'(("d" "default" plain (function org-roam--capture-get-point)
+     "%?"
+     :file-name "${slug}"
+     :head "#+TITLE: ${title}\n#+DATE: %<%A, %d %B %Y>\n#+ROAM_ALIAS: \n"
+     :unnarrowed t)))
+#+end_src
+
+** Org noter
+#+begin_src emacs-lisp
+  (use-package org-noter)
+#+end_src
+
+** Use pdftools
+Use pdftools to allow for annotation using =org-noter=
+
+#+begin_src emacs-lisp
+  (use-package pdf-tools
+    :magic ("%PDF" . pdf-view-mode)
     :config
-    (setq org-journal-file-format
-          (format "%s_%s/%s" "%Y" org-journal-file-type "%m-%d.org")))
+    (pdf-tools-install :no-query))
+
+  (use-package org-pdftools
+    :hook (org-load . org-pdftools-setup-link))
+
+  (use-package org-noter-pdftools
+    :defer t
+    :after org-noter
+    :config
+    (pdf-tools-install)
+    (with-eval-after-load 'pdf-annot
+      (add-hook 'pdf-annot-activate-handler-functions #'org-noter-pdftools-jump-to-note)))
+#+end_src
+** Zotero integration
+
+Install [[https://github.com/egh/zotxt-emacs][zotxt-emacs]] for better integration with org-mode.
+#+begin_src emacs-lisp
+  (use-package zotxt)
 #+end_src
 
 ** Habit tracking
